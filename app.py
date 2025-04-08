@@ -1,5 +1,9 @@
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'bot'))
+
 from flask import Flask, render_template, request
-from bot.dm_bot import send_bulk_dms
+from dm_bot import send_bulk_dms
 
 app = Flask(__name__)
 
