@@ -25,6 +25,29 @@ HTML_2FA = """
 </html>
 """
 
+def attempt_login(client, username, password):
+    try:
+        # Try to login to Instagram
+        client.login(username, password)
+        return True
+    except TwoFactorRequired as e:
+        # If 2FA is required, handle the exception
+        if e.response is None:
+            return False
+
+        error_data = json.loads(e.response.text)
+        two_factor_info = error_data.get("two_factor_info", {})
+        session['two_factor_identifier'] = two_factor_info.get("two_factor_identifier")
+        
+        if not session['two_factor_identifier']:
+            return False
+
+        # Render 2FA page if the identifier exists
+        return False
+
+    except Exception as e:
+        return False
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -35,29 +58,9 @@ def index():
 
         client = Client()
 
-        try:
-            # Login attempt
-            client.login(username, password)
-        except TwoFactorRequired as e:
-            try:
-                # Attempt to handle 2FA by extracting the required data
-                if e.response is None:
-                    return "<h3>Error: Instagram did not send a valid response.</h3>"
-
-                error_data = json.loads(e.response.text)
-                two_factor_info = error_data.get("two_factor_info", {})
-                session['two_factor_identifier'] = two_factor_info.get("two_factor_identifier")
-                
-                if not session['two_factor_identifier']:
-                    return "<h3>2FA failed: Missing two_factor_identifier from Instagram.</h3>"
-                
-                # Render 2FA input form
-                return render_template_string(HTML_2FA)
-            except Exception as ex:
-                return f"<h3>Failed to extract 2FA info: {str(ex)}</h3>"
-
-        except Exception as e:
-            return f"<h3>Login failed: {str(e)}</h3>"
+        # First login attempt
+        if not attempt_login(client, username, password):
+            return render_template_string(HTML_2FA)
 
         return "<h3>Login successful!</h3>"
 
@@ -87,7 +90,12 @@ def verify_2fa():
             two_factor_identifier,
             verification_code
         )
-        return "<h3>2FA Authentication successful!</h3>"
+
+        # Retry login after successful 2FA
+        if attempt_login(client, session['username'], session['password']):
+            return "<h3>2FA Authentication successful! You are now logged in.</h3>"
+        else:
+            return "<h3>Failed to login after 2FA verification.</h3>"
 
     except Exception as e:
         return f"<h3>2FA failed: {str(e)}</h3>"
