@@ -1,5 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request
 from instagrapi import Client
+import time  # for adding delay between messages
 
 app = Flask(__name__)
 
@@ -18,9 +19,10 @@ def send_dms():
     target_account = request.form['target_account']
     message_count = int(request.form['message_count'])  # Number of accounts to message
     target = request.form['target']  # Followers or following
+    message = request.form['message']  # The message to send
+    delay_time = int(request.form['delay_time'])  # Delay time in seconds between each DM
     two_factor_code = request.form.get('two_factor_code', '').strip()  # Optional 2FA code
 
-    # Attempt to login
     try:
         # Login to Instagram
         client.login(username, password, two_factor_code=two_factor_code)
@@ -28,7 +30,6 @@ def send_dms():
         # Get the target account's followers or following
         target_user_id = client.user_id_from_username(target_account)
 
-        # Fetch the followers or following based on the selected option
         if target == 'followers':
             target_list = client.user_followers(target_user_id)
         elif target == 'following':
@@ -37,9 +38,11 @@ def send_dms():
         # Ensure we don't send messages to more than the specified count
         target_list = target_list[:message_count]
 
-        # Send messages to the selected accounts
+        # Send messages with delay
         for user in target_list:
-            client.direct_send("Hello from the bot!", [user.username])
+            client.direct_send(message, [user.username])
+            print(f"Sent DM to {user.username}")  # Optional print for logging
+            time.sleep(delay_time)  # Add the delay between messages
 
         return f"DMs sent successfully to {len(target_list)} accounts!"
 
