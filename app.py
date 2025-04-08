@@ -13,6 +13,7 @@ def login(username, password, two_factor_code=None):
     try:
         # Attempt login with username and password
         client.login(username, password)
+
     except Exception as e:
         logging.error(f"Login failed: {e}")
         if 'Two-Factor Authentication' in str(e):
@@ -23,13 +24,11 @@ def login(username, password, two_factor_code=None):
                 raise Exception("2FA code not provided.")
     return client
 
-
 # Function to get followers of a target username
 def get_followers_list(client, target_username):
     user_id = client.user_id_from_username(target_username)
     followers = client.user_followers(user_id)
     return [follower.pk for follower in followers]
-
 
 # Function to send DMs to all followers
 def send_bulk_dms(client, message, followers_list):
@@ -41,12 +40,10 @@ def send_bulk_dms(client, message, followers_list):
         logging.error(f"Error sending DM: {e}")
         raise Exception("Error when sending bulk DMs.")
 
-
 # Flask route to display the form (UI)
 @app.route('/')
 def index():
     return render_template('index.html')
-
 
 # Flask route to handle DM sending
 @app.route('/send_dms', methods=['POST'])
@@ -76,7 +73,6 @@ def send_dms():
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 # Running the Flask application
 if __name__ == "__main__":
