@@ -3,10 +3,6 @@ from instagrapi import Client
 
 app = Flask(__name__)
 
-# Your login details (can be entered in the form)
-username = ""
-password = ""
-
 # Initialize the Instagram client
 client = Client()
 
@@ -16,34 +12,36 @@ def index():
 
 @app.route('/send_dms', methods=['POST'])
 def send_dms():
-    global username, password
-
     # Get the input values from the form
     username = request.form['username']
     password = request.form['password']
-    two_factor_code = request.form['two_factor_code']  # Ensure this is passed as a string
-    target = request.form['target']
+    target_account = request.form['target_account']
+    message_count = int(request.form['message_count'])  # Number of accounts to message
+    target = request.form['target']  # Followers or following
+    two_factor_code = request.form.get('two_factor_code', '').strip()  # Optional 2FA code
 
     # Attempt to login
     try:
-        # Ensure two_factor_code is a string, if empty, it will be passed as an empty string
-        two_factor_code = str(two_factor_code).strip()
-
-        # Login with the provided credentials and 2FA code
+        # Login to Instagram
         client.login(username, password, two_factor_code=two_factor_code)
-        
-        # Choose between followers or following based on the user's selection
+
+        # Get the target account's followers or following
+        target_user_id = client.user_id_from_username(target_account)
+
+        # Fetch the followers or following based on the selected option
         if target == 'followers':
-            # Code for sending DMs to followers
-            # Example: client.user_followers(user_id)
-            print(f"Sending DMs to {username}'s followers...")
-
+            target_list = client.user_followers(target_user_id)
         elif target == 'following':
-            # Code for sending DMs to following
-            # Example: client.user_following(user_id)
-            print(f"Sending DMs to {username}'s following...")
+            target_list = client.user_following(target_user_id)
 
-        return "DMs sent successfully!"
+        # Ensure we don't send messages to more than the specified count
+        target_list = target_list[:message_count]
+
+        # Send messages to the selected accounts
+        for user in target_list:
+            client.direct_send("Hello from the bot!", [user.username])
+
+        return f"DMs sent successfully to {len(target_list)} accounts!"
 
     except Exception as e:
         return f"An error occurred: {str(e)}"
