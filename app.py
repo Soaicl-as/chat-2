@@ -13,15 +13,19 @@ def login(username, password, two_factor_code=None):
     try:
         # Attempt login with username and password
         client.login(username, password)
+        logging.info("Login successful")
 
     except Exception as e:
         logging.error(f"Login failed: {e}")
         if 'Two-Factor Authentication' in str(e):
             if two_factor_code:
+                # Ensure 2FA code is passed as a string
+                two_factor_code = str(two_factor_code)  
+                logging.info("Attempting 2FA login")
                 # Handle 2FA using provided code
                 client.login(username, password, 2fa_code=two_factor_code)
             else:
-                raise Exception("2FA code not provided.")
+                raise Exception("2FA code not provided. Please enter the code sent to your phone.")
     return client
 
 # Function to get followers of a target username
@@ -58,6 +62,10 @@ def send_dms():
 
         if not username or not password or not message or not target_username:
             return jsonify({"error": "Missing required fields"}), 400
+
+        # Ensure 2FA code is passed as a string (if provided)
+        if two_factor_code:
+            two_factor_code = str(two_factor_code)  
 
         # Login to Instagram
         client = login(username, password, two_factor_code)
