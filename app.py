@@ -1,8 +1,8 @@
 import os
-import time
 from instagrapi import Client
 from flask import Flask, render_template_string, request, session
 from instagrapi.exceptions import TwoFactorRequired
+import time
 import json
 
 app = Flask(__name__)
