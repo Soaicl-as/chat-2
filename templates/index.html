@@ -7,34 +7,30 @@
 </head>
 <body>
     <h1>Instagram DM Sender</h1>
-
-    <form action="/send_dms" method="POST">
+    <form method="POST">
         <label for="username">Instagram Username:</label><br>
         <input type="text" id="username" name="username" required><br><br>
 
         <label for="password">Instagram Password:</label><br>
         <input type="password" id="password" name="password" required><br><br>
 
-        <label for="target_account">Target Account (e.g., username):</label><br>
-        <input type="text" id="target_account" name="target_account" required><br><br>
+        <label for="account">Account to Pull Followers/Following from:</label><br>
+        <input type="text" id="account" name="account" required><br><br>
 
-        <label for="message_count">Number of accounts to message:</label><br>
-        <input type="number" id="message_count" name="message_count" min="1" required><br><br>
-
-        <label>Message:</label><br>
+        <label for="message">Message to Send:</label><br>
         <textarea id="message" name="message" required></textarea><br><br>
 
-        <label>Message:</label><br>
-        <input type="radio" id="followers" name="target" value="followers" required>
-        <label for="followers">Followers</label><br>
-        <input type="radio" id="following" name="target" value="following" required>
-        <label for="following">Following</label><br><br>
+        <label for="followers_or_following">Choose whether to message Followers or Following:</label><br>
+        <select id="followers_or_following" name="followers_or_following" required>
+            <option value="followers">Followers</option>
+            <option value="following">Following</option>
+        </select><br><br>
 
-        <label for="delay_time">Delay Time (seconds) between messages:</label><br>
-        <input type="number" id="delay_time" name="delay_time" min="1" required><br><br>
+        <label for="num_accounts">Number of Accounts to Message:</label><br>
+        <input type="number" id="num_accounts" name="num_accounts" min="1" required><br><br>
 
-        <label for="two_factor_code">2FA Code (if required):</label><br>
-        <input type="text" id="two_factor_code" name="two_factor_code"><br><br>
+        <label for="delay">Time Delay Between Messages (in seconds):</label><br>
+        <input type="number" id="delay" name="delay" step="0.1" min="0.1" required><br><br>
 
         <button type="submit">Send DMs</button>
     </form>
