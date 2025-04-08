@@ -66,7 +66,7 @@ def index():
         except Exception as e:
             return f"An error occurred: {e}"
 
-    return render_template("index.html")
+    return render_template("index.html")  # This should render the HTML correctly
 
 if __name__ == "__main__":
     app.run(debug=True)
