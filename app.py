@@ -1,15 +1,14 @@
 import os
 import logging
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from instagrapi import Client
 
 app = Flask(__name__)
 
 logging.basicConfig(level=logging.DEBUG)
 
-
 # Function to login to Instagram
-def login(username, password):
+def login(username, password, two_factor_code=None):
     client = Client()
     try:
         # Attempt login with username and password
@@ -17,12 +16,11 @@ def login(username, password):
     except Exception as e:
         logging.error(f"Login failed: {e}")
         if 'Two-Factor Authentication' in str(e):
-            # Handle 2FA using environment variable
-            code = os.getenv('INSTAGRAM_2FA_CODE')  # Get 2FA code from environment variable
-            if code:
-                client.login(username, password, 2fa_code=code)
+            if two_factor_code:
+                # Handle 2FA using provided code
+                client.login(username, password, 2fa_code=two_factor_code)
             else:
-                raise Exception("2FA code not provided via environment variable.")
+                raise Exception("2FA code not provided.")
     return client
 
 
@@ -44,6 +42,12 @@ def send_bulk_dms(client, message, followers_list):
         raise Exception("Error when sending bulk DMs.")
 
 
+# Flask route to display the form (UI)
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
 # Flask route to handle DM sending
 @app.route('/send_dms', methods=['POST'])
 def send_dms():
@@ -51,6 +55,7 @@ def send_dms():
         # Get the data from the POST request
         username = request.form.get('username')
         password = request.form.get('password')
+        two_factor_code = request.form.get('two_factor_code')
         message = request.form.get('message')
         target_username = request.form.get('target_username')
 
@@ -58,7 +63,7 @@ def send_dms():
             return jsonify({"error": "Missing required fields"}), 400
 
         # Login to Instagram
-        client = login(username, password)
+        client = login(username, password, two_factor_code)
 
         # Get followers list
         followers_list = get_followers_list(client, target_username)
