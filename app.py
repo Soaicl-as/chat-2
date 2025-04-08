@@ -1,5 +1,6 @@
 from flask import Flask, request, render_template_string
 from instagrapi import Client
+from instagrapi.exceptions import TwoFactorRequired
 import time
 
 app = Flask(__name__)
@@ -15,16 +16,14 @@ HTML_FORM = """
     <h1>Instagram DM Sender</h1>
     <form method="POST">
         <label>Instagram Username:</label><br>
-        <input type="text" name="username" required><br><br>
+        <input type="text" name="username" value="{{ saved_username or '' }}" required><br><br>
 
         <label>Instagram Password:</label><br>
-        <input type="password" name="password" required><br><br>
+        <input type="password" name="password" value="{{ saved_password or '' }}" required><br><br>
 
         {% if show_2fa %}
         <label>Enter 2FA Code:</label><br>
         <input type="text" name="code" required><br><br>
-        <input type="hidden" name="username" value="{{ saved_username }}">
-        <input type="hidden" name="password" value="{{ saved_password }}">
         <input type="hidden" name="step" value="2fa">
         <button type="submit">Verify 2FA</button>
         {% else %}
@@ -59,10 +58,10 @@ clients = {}
 def index():
     if request.method == "POST":
         step = request.form.get("step")
+        username = request.form["username"]
+        password = request.form["password"]
 
         if step == "2fa":
-            username = request.form["username"]
-            password = request.form["password"]
             code = request.form["code"]
             client = clients.get(username)
 
@@ -70,29 +69,27 @@ def index():
                 return "Session expired. Please restart."
 
             try:
-                client.two_factor_login(code)
-                return render_template_string(HTML_FORM, show_2fa=False)
+                client.complete_two_factor_login(code)
+                return "2FA successful. You can now restart and send DMs."
             except Exception as e:
                 return f"2FA failed: {e}"
 
-        username = request.form["username"]
-        password = request.form["password"]
-
-        target_account = request.form.get("target_account")
-        message = request.form.get("message")
-        direction = request.form.get("direction")
-        limit = int(request.form.get("limit", 1))
-        delay = float(request.form.get("delay", 1.0))
-
+        # Otherwise: initial login attempt
         client = Client()
-
         try:
             client.login(username, password)
+        except TwoFactorRequired:
+            clients[username] = client
+            return render_template_string(HTML_FORM, show_2fa=True, saved_username=username, saved_password=password)
         except Exception as e:
-            if "two-factor authentication is required" in str(e).lower():
-                clients[username] = client
-                return render_template_string(HTML_FORM, show_2fa=True, saved_username=username, saved_password=password)
             return f"Login failed: {e}"
+
+        # Continue to message sending
+        target_account = request.form["target_account"]
+        message = request.form["message"]
+        direction = request.form["direction"]
+        limit = int(request.form["limit"])
+        delay = float(request.form["delay"])
 
         try:
             user_id = client.user_id_from_username(target_account)
@@ -105,7 +102,7 @@ def index():
                 client.direct_send(message, [user.pk])
                 time.sleep(delay)
 
-            return "Messages sent successfully."
+            return "Messages sent successfully!"
         except Exception as e:
             return f"An error occurred while sending DMs: {e}"
 
