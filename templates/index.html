@@ -1,38 +1,34 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Instagram DM Sender</title>
-</head>
+<html>
+<head><title>Instagram DM Bot</title></head>
 <body>
-    <h1>Instagram DM Sender</h1>
-    <form method="POST">
-        <label for="username">Instagram Username:</label><br>
-        <input type="text" id="username" name="username" required><br><br>
+  <h1>Instagram DM Bot</h1>
+  <form method="post">
+    <label>Instagram Username:</label><br>
+    <input name="username"><br><br>
 
-        <label for="password">Instagram Password:</label><br>
-        <input type="password" id="password" name="password" required><br><br>
+    <label>Instagram Password:</label><br>
+    <input name="password" type="password"><br><br>
 
-        <label for="account">Account to Pull Followers/Following from:</label><br>
-        <input type="text" id="account" name="account" required><br><br>
+    <label>Target Username:</label><br>
+    <input name="target_username"><br><br>
 
-        <label for="message">Message to Send:</label><br>
-        <textarea id="message" name="message" required></textarea><br><br>
+    <label>Message to Send:</label><br>
+    <textarea name="message"></textarea><br><br>
 
-        <label for="followers_or_following">Choose whether to message Followers or Following:</label><br>
-        <select id="followers_or_following" name="followers_or_following" required>
-            <option value="followers">Followers</option>
-            <option value="following">Following</option>
-        </select><br><br>
+    <label>Followers or Following:</label><br>
+    <select name="relationship">
+      <option value="followers">Followers</option>
+      <option value="following">Following</option>
+    </select><br><br>
 
-        <label for="num_accounts">Number of Accounts to Message:</label><br>
-        <input type="number" id="num_accounts" name="num_accounts" min="1" required><br><br>
+    <label>How Many Accounts to Message:</label><br>
+    <input name="amount" type="number"><br><br>
 
-        <label for="delay">Time Delay Between Messages (in seconds):</label><br>
-        <input type="number" id="delay" name="delay" step="0.1" min="0.1" required><br><br>
+    <label>Delay Between Messages (seconds):</label><br>
+    <input name="delay" type="number" step="0.1"><br><br>
 
-        <button type="submit">Send DMs</button>
-    </form>
+    <button type="submit">Send DMs</button>
+  </form>
 </body>
 </html>
