@@ -21,12 +21,16 @@ def send_dms():
     # Get the input values from the form
     username = request.form['username']
     password = request.form['password']
-    two_factor_code = request.form['two_factor_code']
+    two_factor_code = request.form['two_factor_code']  # Ensure this is passed as a string
     target = request.form['target']
 
     # Attempt to login
     try:
-        client.login(username, password, 2fa_code=two_factor_code)
+        # Ensure two_factor_code is a string, if empty, it will be passed as an empty string
+        two_factor_code = str(two_factor_code).strip()
+
+        # Login with the provided credentials and 2FA code
+        client.login(username, password, two_factor_code=two_factor_code)
         
         # Choose between followers or following based on the user's selection
         if target == 'followers':
