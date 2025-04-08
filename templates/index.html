@@ -6,7 +6,6 @@
     <title>Instagram DM Sender</title>
 </head>
 <body>
-
     <h1>Instagram DM Sender</h1>
 
     <form action="/send_dms" method="POST">
@@ -16,17 +15,22 @@
         <label for="password">Instagram Password:</label><br>
         <input type="password" id="password" name="password" required><br><br>
 
-        <label for="two_factor_code">2FA Code:</label><br>
-        <input type="text" id="two_factor_code" name="two_factor_code" required><br><br>
+        <label for="target_account">Target Account (e.g., username):</label><br>
+        <input type="text" id="target_account" name="target_account" required><br><br>
 
-        <label for="followers_toggle">Message Followers</label>
-        <input type="radio" id="followers_toggle" name="target" value="followers" checked>
-        
-        <label for="following_toggle">Message Following</label>
-        <input type="radio" id="following_toggle" name="target" value="following"><br><br>
+        <label for="message_count">Number of accounts to message:</label><br>
+        <input type="number" id="message_count" name="message_count" min="1" required><br><br>
+
+        <label>Message:</label><br>
+        <input type="radio" id="followers" name="target" value="followers" required>
+        <label for="followers">Followers</label><br>
+        <input type="radio" id="following" name="target" value="following" required>
+        <label for="following">Following</label><br><br>
+
+        <label for="two_factor_code">2FA Code (if required):</label><br>
+        <input type="text" id="two_factor_code" name="two_factor_code"><br><br>
 
         <button type="submit">Send DMs</button>
     </form>
-
 </body>
 </html>
