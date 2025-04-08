@@ -1,129 +1,99 @@
-import os
+from flask import Flask, render_template, request, redirect, url_for, session
 from instagrapi import Client
-from flask import Flask, render_template_string, request, session
-from instagrapi.exceptions import TwoFactorRequired
+from instagrapi.exceptions import TwoFactorRequired, ChallengeRequired
 import time
-import json
+import threading
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = 'your_secret_key'
+client = Client()
+login_in_progress = False
 
-HTML_2FA = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>Instagram 2FA</title>
-    </head>
-    <body>
-        <h2>Instagram 2FA Authentication</h2>
-        <form method="POST" action="/verify_2fa">
-            <label for="code">Enter the 2FA code you received:</label>
-            <input type="text" id="code" name="code" required>
-            <input type="submit" value="Submit">
-        </form>
-    </body>
-</html>
-"""
+def send_dms(client, users, message, delay):
+    for user in users:
+        try:
+            client.direct_send(message, [user.pk])
+            print(f"DM sent to {user.username}")
+        except Exception as e:
+            print(f"Failed to DM {user.username}: {e}")
+        time.sleep(delay)
 
-def attempt_login(client, username, password):
-    try:
-        # Try to login to Instagram
-        client.login(username, password)
-        return True
-    except TwoFactorRequired as e:
-        # If 2FA is required, handle the exception
-        if e.response is None:
-            return False
-
-        error_data = json.loads(e.response.text)
-        two_factor_info = error_data.get("two_factor_info", {})
-        session['two_factor_identifier'] = two_factor_info.get("two_factor_identifier")
-        
-        if not session['two_factor_identifier']:
-            return False
-
-        # Render 2FA page if the identifier exists
-        return False
-
-    except Exception as e:
-        return False
-
-@app.route('/', methods=['GET', 'POST'])
+@app.route("/", methods=["GET", "POST"])
 def index():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        session['username'] = username
-        session['password'] = password
+    global login_in_progress
 
-        client = Client()
+    if request.method == "POST":
+        session['username'] = request.form["username"]
+        session['password'] = request.form["password"]
+        session['target_username'] = request.form["target_username"]
+        session['message'] = request.form["message"]
+        session['amount'] = int(request.form["amount"])
+        session['delay'] = float(request.form["delay"])
+        session['relationship'] = request.form["relationship"]
 
-        # First login attempt
-        if not attempt_login(client, username, password):
-            return render_template_string(HTML_2FA)
+        try:
+            login_in_progress = True
+            client.login(session['username'], session['password'])
+            login_in_progress = False
+        except ChallengeRequired as e:
+            session['challenge_url'] = e.challenge_url
+            return render_template("verify.html", error=None)
+        except TwoFactorRequired:
+            return render_template("error.html", error="2FA code required but not provided.")
+        except Exception as e:
+            login_in_progress = False
+            return render_template("error.html", error=f"Login failed: {str(e)}")
 
-        # After successful login or 2FA, continue processing
-        return "<h3>Login successful!</h3>"
+        return redirect("/start")
 
-    return '''
-        <form method="POST">
-            <label for="username">Username:</label><br>
-            <input type="text" id="username" name="username" required><br><br>
-            <label for="password">Password:</label><br>
-            <input type="password" id="password" name="password" required><br><br>
-            <input type="submit" value="Login">
-        </form>
-    '''
+    return render_template("index.html")
 
-@app.route('/verify_2fa', methods=['POST'])
-def verify_2fa():
-    verification_code = request.form['code']
-    two_factor_identifier = session.get('two_factor_identifier')
-
-    if not two_factor_identifier:
-        return "<h3>2FA identifier missing, unable to verify.</h3>"
-
-    client = Client()
+@app.route("/start")
+def start():
+    target_username = session.get("target_username")
+    amount = session.get("amount")
+    relationship = session.get("relationship")
 
     try:
-        # Attempt login with 2FA
-        client.complete_two_factor_login(
-            two_factor_identifier,
-            verification_code
-        )
-
-        # Retry login after successful 2FA
-        if attempt_login(client, session['username'], session['password']):
-            return "<h3>2FA Authentication successful! You are now logged in.</h3>"
+        user_id = client.user_id_from_username(target_username)
+        if relationship == "followers":
+            users = client.user_followers(user_id, amount=amount)
         else:
-            return "<h3>Failed to login after 2FA verification.</h3>"
+            users = client.user_following(user_id, amount=amount)
+
+        users = list(users.values())
+        message = session.get("message")
+        delay = session.get("delay")
+
+        threading.Thread(target=send_dms, args=(client, users, message, delay)).start()
+        return "DMs are being sent in the background."
 
     except Exception as e:
-        return f"<h3>2FA failed: {str(e)}</h3>"
+        return render_template("error.html", error=f"Failed to fetch users or send DMs: {e}")
 
-@app.route('/retry_login', methods=['GET'])
-def retry_login():
-    # This route will automatically retry login once you confirm it in the browser
-    username = session.get('username')
-    password = session.get('password')
-    
-    if not username or not password:
-        return "<h3>No username or password found in session.</h3>"
+@app.route("/verify", methods=["POST"])
+def verify():
+    try:
+        client.challenge_resolve()
+        print("Account unlocked")
+        return redirect("/auto_retry_login")
+    except Exception as e:
+        return render_template("error.html", error=f"Challenge resolution failed: {str(e)}")
 
-    client = Client()
+@app.route("/auto_retry_login")
+def auto_retry_login():
+    global login_in_progress
+    if login_in_progress:
+        return "Login is already in progress, please wait."
 
-    # Wait for Instagram to unsecure the account after you confirm in the browser
-    retries = 0
-    while retries < 5:
-        # Attempt login
-        if attempt_login(client, username, password):
-            return "<h3>Login successful after account was unsecured.</h3>"
+    try:
+        login_in_progress = True
+        client.login(session['username'], session['password'])
+        login_in_progress = False
+        return redirect("/start")
+    except Exception as e:
+        login_in_progress = False
+        return render_template("error.html", error=f"Auto-login retry failed: {str(e)}")
 
-        # Wait a few seconds before retrying
-        retries += 1
-        time.sleep(5)
-
-    return "<h3>Account is still secured. Please try again later after confirming the login in your browser.</h3>"
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=8080)
