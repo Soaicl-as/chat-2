@@ -16,7 +16,7 @@ HTML_2FA = """
     </head>
     <body>
         <h2>Instagram 2FA Authentication</h2>
-        <form method="POST">
+        <form method="POST" action="/verify_2fa">
             <label for="code">Enter the 2FA code you received:</label>
             <input type="text" id="code" name="code" required>
             <input type="submit" value="Submit">
@@ -41,6 +41,9 @@ def index():
         except TwoFactorRequired as e:
             try:
                 # Attempt to handle 2FA by extracting the required data
+                if e.response is None:
+                    return "<h3>Error: Instagram did not send a valid response.</h3>"
+
                 error_data = json.loads(e.response.text)
                 two_factor_info = error_data.get("two_factor_info", {})
                 session['two_factor_identifier'] = two_factor_info.get("two_factor_identifier")
