@@ -22,10 +22,16 @@
         <input type="number" id="message_count" name="message_count" min="1" required><br><br>
 
         <label>Message:</label><br>
+        <textarea id="message" name="message" required></textarea><br><br>
+
+        <label>Message:</label><br>
         <input type="radio" id="followers" name="target" value="followers" required>
         <label for="followers">Followers</label><br>
         <input type="radio" id="following" name="target" value="following" required>
         <label for="following">Following</label><br><br>
+
+        <label for="delay_time">Delay Time (seconds) between messages:</label><br>
+        <input type="number" id="delay_time" name="delay_time" min="1" required><br><br>
 
         <label for="two_factor_code">2FA Code (if required):</label><br>
         <input type="text" id="two_factor_code" name="two_factor_code"><br><br>
