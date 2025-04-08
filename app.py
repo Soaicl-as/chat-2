@@ -1,87 +1,48 @@
-import os
-import logging
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, render_template, request, redirect, url_for
 from instagrapi import Client
 
 app = Flask(__name__)
 
-logging.basicConfig(level=logging.DEBUG)
+# Your login details (can be entered in the form)
+username = ""
+password = ""
 
-# Function to login to Instagram
-def login(username, password, two_factor_code=None):
-    client = Client()
-    try:
-        # Attempt login with username and password
-        client.login(username, password)
-        logging.info("Login successful")
+# Initialize the Instagram client
+client = Client()
 
-    except Exception as e:
-        logging.error(f"Login failed: {e}")
-        if 'Two-Factor Authentication' in str(e):
-            if two_factor_code:
-                # Ensure 2FA code is passed as a string
-                two_factor_code = str(two_factor_code)  
-                logging.info("Attempting 2FA login")
-                # Handle 2FA using the provided code
-                client.two_factor_login(two_factor_code)
-            else:
-                raise Exception("2FA code not provided. Please enter the code sent to your phone.")
-    return client
-
-# Function to get followers of a target username
-def get_followers_list(client, target_username):
-    user_id = client.user_id_from_username(target_username)
-    followers = client.user_followers(user_id)
-    return [follower.pk for follower in followers]
-
-# Function to send DMs to all followers
-def send_bulk_dms(client, message, followers_list):
-    try:
-        for follower in followers_list:
-            client.direct_send(message, user_ids=[follower])
-            logging.info(f"DM sent to {follower}")
-    except Exception as e:
-        logging.error(f"Error sending DM: {e}")
-        raise Exception("Error when sending bulk DMs.")
-
-# Flask route to display the form (UI)
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Flask route to handle DM sending
 @app.route('/send_dms', methods=['POST'])
 def send_dms():
+    global username, password
+
+    # Get the input values from the form
+    username = request.form['username']
+    password = request.form['password']
+    two_factor_code = request.form['two_factor_code']
+    target = request.form['target']
+
+    # Attempt to login
     try:
-        # Get the data from the POST request
-        username = request.form.get('username')
-        password = request.form.get('password')
-        two_factor_code = request.form.get('two_factor_code')
-        message = request.form.get('message')
-        target_username = request.form.get('target_username')
+        client.login(username, password, 2fa_code=two_factor_code)
+        
+        # Choose between followers or following based on the user's selection
+        if target == 'followers':
+            # Code for sending DMs to followers
+            # Example: client.user_followers(user_id)
+            print(f"Sending DMs to {username}'s followers...")
 
-        if not username or not password or not message or not target_username:
-            return jsonify({"error": "Missing required fields"}), 400
+        elif target == 'following':
+            # Code for sending DMs to following
+            # Example: client.user_following(user_id)
+            print(f"Sending DMs to {username}'s following...")
 
-        # Ensure 2FA code is passed as a string (if provided)
-        if two_factor_code:
-            two_factor_code = str(two_factor_code)  
-
-        # Login to Instagram
-        client = login(username, password, two_factor_code)
-
-        # Get followers list
-        followers_list = get_followers_list(client, target_username)
-
-        # Send DMs to all followers
-        send_bulk_dms(client, message, followers_list)
-
-        return jsonify({"success": "DMs sent successfully!"}), 200
+        return "DMs sent successfully!"
 
     except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        return jsonify({"error": str(e)}), 500
+        return f"An error occurred: {str(e)}"
 
-# Running the Flask application
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)  # Makes the app accessible externally
