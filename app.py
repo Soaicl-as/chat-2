@@ -1,9 +1,11 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, render_template_string, request, redirect, url_for, session
 from instagrapi import Client
 from instagrapi.exceptions import TwoFactorRequired
 import time
+import os
 
 app = Flask(__name__)
+app.secret_key = os.urandom(24)
 
 HTML_FORM = """
 <!DOCTYPE html>
@@ -16,97 +18,115 @@ HTML_FORM = """
     <h1>Instagram DM Sender</h1>
     <form method="POST">
         <label>Instagram Username:</label><br>
-        <input type="text" name="username" value="{{ saved_username or '' }}" required><br><br>
+        <input type="text" name="username" required><br><br>
 
         <label>Instagram Password:</label><br>
-        <input type="password" name="password" value="{{ saved_password or '' }}" required><br><br>
+        <input type="password" name="password" required><br><br>
 
-        {% if show_2fa %}
-        <label>Enter 2FA Code:</label><br>
-        <input type="text" name="code" required><br><br>
-        <input type="hidden" name="step" value="2fa">
-        <button type="submit">Verify 2FA</button>
-        {% else %}
-        <label>Account to Pull From:</label><br>
-        <input type="text" name="target_account" required><br><br>
+        <label>Account to Pull Followers/Following from:</label><br>
+        <input type="text" name="account" required><br><br>
 
         <label>Message to Send:</label><br>
         <textarea name="message" required></textarea><br><br>
 
-        <label>Choose Followers or Following:</label><br>
-        <select name="direction" required>
+        <label>Message Followers or Following:</label><br>
+        <select name="followers_or_following" required>
             <option value="followers">Followers</option>
             <option value="following">Following</option>
         </select><br><br>
 
-        <label>Number of People to Message:</label><br>
-        <input type="number" name="limit" min="1" required><br><br>
+        <label>Number of Accounts to Message:</label><br>
+        <input type="number" name="num_accounts" min="1" required><br><br>
 
         <label>Delay Between Messages (seconds):</label><br>
-        <input type="number" step="0.1" name="delay" required><br><br>
+        <input type="number" name="delay" step="0.1" min="0.1" required><br><br>
 
         <button type="submit">Send DMs</button>
-        {% endif %}
     </form>
 </body>
 </html>
 """
 
-clients = {}
+HTML_2FA = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Enter 2FA Code</title>
+</head>
+<body>
+    <h1>Two-Factor Authentication Required</h1>
+    <form method="POST">
+        <label>Enter 2FA Code:</label><br>
+        <input type="text" name="verification_code" required><br><br>
+        <button type="submit">Verify</button>
+    </form>
+</body>
+</html>
+"""
 
-@app.route("/", methods=["GET", "POST"])
+client = Client()
+
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    if request.method == "POST":
-        step = request.form.get("step")
-        username = request.form["username"]
-        password = request.form["password"]
-
-        if step == "2fa":
-            code = request.form["code"]
-            client = clients.get(username)
-
-            if not client:
-                return "Session expired. Please restart."
-
+    if request.method == 'POST':
+        if 'verification_code' in request.form:
+            verification_code = request.form['verification_code']
             try:
-                client.complete_two_factor_login(code)
-                return "2FA successful. You can now restart and send DMs."
+                client.login(
+                    session['username'],
+                    session['password'],
+                    verification_code=verification_code,
+                    two_factor_identifier=session['two_factor_identifier']
+                )
+                return redirect(url_for('send_dms'))
             except Exception as e:
-                return f"2FA failed: {e}"
+                return f"<h3>2FA failed: {str(e)}</h3>"
 
-        # Otherwise: initial login attempt
-        client = Client()
-        try:
-            client.login(username, password)
-        except TwoFactorRequired:
-            clients[username] = client
-            return render_template_string(HTML_FORM, show_2fa=True, saved_username=username, saved_password=password)
-        except Exception as e:
-            return f"Login failed: {e}"
-
-        # Continue to message sending
-        target_account = request.form["target_account"]
-        message = request.form["message"]
-        direction = request.form["direction"]
-        limit = int(request.form["limit"])
-        delay = float(request.form["delay"])
+        session['username'] = request.form['username']
+        session['password'] = request.form['password']
+        session['account'] = request.form['account']
+        session['message'] = request.form['message']
+        session['followers_or_following'] = request.form['followers_or_following']
+        session['num_accounts'] = int(request.form['num_accounts'])
+        session['delay'] = float(request.form['delay'])
 
         try:
-            user_id = client.user_id_from_username(target_account)
-            if direction == "followers":
-                users = client.user_followers(user_id, amount=limit)
-            else:
-                users = client.user_following(user_id, amount=limit)
-
-            for user in users.values():
-                client.direct_send(message, [user.pk])
-                time.sleep(delay)
-
-            return "Messages sent successfully!"
+            client.login(session['username'], session['password'])
+            return redirect(url_for('send_dms'))
+        except TwoFactorRequired as e:
+            session['two_factor_identifier'] = e.two_factor_identifier
+            return render_template_string(HTML_2FA)
         except Exception as e:
-            return f"An error occurred while sending DMs: {e}"
+            return f"<h3>Login failed: {str(e)}</h3>"
 
-    return render_template_string(HTML_FORM, show_2fa=False)
+    return render_template_string(HTML_FORM)
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080, debug=True)
+@app.route('/send_dms')
+def send_dms():
+    account = session['account']
+    message = session['message']
+    target_type = session['followers_or_following']
+    num_accounts = session['num_accounts']
+    delay = session['delay']
+
+    try:
+        user_id = client.user_id_from_username(account)
+        if target_type == "followers":
+            users = client.user_followers(user_id, amount=num_accounts)
+        else:
+            users = client.user_following(user_id, amount=num_accounts)
+
+        count = 0
+        for user in users.values():
+            client.direct_send(message, [user.pk])
+            count += 1
+            time.sleep(delay)
+
+        return f"<h3>Successfully messaged {count} users.</h3>"
+
+    except Exception as e:
+        return f"<h3>Error sending DMs: {str(e)}</h3>"
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080, debug=True)
