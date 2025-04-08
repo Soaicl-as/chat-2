@@ -22,8 +22,8 @@ def login(username, password, two_factor_code=None):
                 # Ensure 2FA code is passed as a string
                 two_factor_code = str(two_factor_code)  
                 logging.info("Attempting 2FA login")
-                # Handle 2FA using provided code
-                client.login(username, password, 2fa_code=two_factor_code)
+                # Handle 2FA using the provided code
+                client.two_factor_login(two_factor_code)
             else:
                 raise Exception("2FA code not provided. Please enter the code sent to your phone.")
     return client
