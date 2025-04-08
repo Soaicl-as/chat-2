@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Instagram Mass DM Bot</title>
+</head>
+<body>
+  <h1>Instagram Mass DM Bot</h1>
+  <form method="POST">
+    <input name="username" placeholder="Your Username" required><br>
+    <input name="password" placeholder="Your Password" type="password" required><br>
+    <input name="target_user" placeholder="Target Username" required><br>
+    <textarea name="message" placeholder="Message to Send" required></textarea><br>
+    <input name="limit" type="number" placeholder="Number of Messages" min="1" required><br>
+    <input name="delay" type="number" step="0.1" placeholder="Delay (s)" min="0.1" required><br>
+    <label><input type="radio" name="mode" value="followers" checked>Followers</label>
+    <label><input type="radio" name="mode" value="following">Following</label><br>
+    <button type="submit">Send DMs</button>
+  </form>
+  {% if response %}
+    <p>{{ response }}</p>
+  {% endif %}
+</body>
+</html>
