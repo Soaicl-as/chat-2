@@ -1,17 +1,11 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head><title>Status</title></head>
+<head>
+    <title>Status</title>
+    <meta http-equiv="refresh" content="5">
+</head>
 <body>
-  <h2>Status</h2>
-  <p>{{ status }}</p>
-  {% if "Logged in" in status %}
+    <h3>Status: {{ status }}</h3>
     <a href="/send_dms">Send DMs</a>
-  {% elif "Login challenge required" in status %}
-    <p>Once you approve login in browser, <a href="/check_secure_account">click here to retry login</a>.</p>
-    <script>
-      // Optional: Auto-ping every 5s
-      setInterval(() => fetch("/check_secure_account"), 5000);
-    </script>
-  {% endif %}
 </body>
 </html>
