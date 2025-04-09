@@ -1,28 +1,23 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, session
 from instagrapi import Client
-from instagrapi.exceptions import TwoFactorRequired, ChallengeRequired
+from instagrapi.exceptions import ChallengeRequired, TwoFactorRequired
 import time
 import threading
+import os
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "very_secret")
+
 client = Client()
 login_in_progress = False
 
-def send_dms(client, users, message, delay):
-    for user in users:
-        try:
-            client.direct_send(message, [user.pk])
-            print(f"DM sent to {user.username}")
-        except Exception as e:
-            print(f"Failed to DM {user.username}: {e}")
-        time.sleep(delay)
 
 @app.route("/", methods=["GET", "POST"])
 def index():
     global login_in_progress
 
     if request.method == "POST":
+        # Save form input to session
         session['username'] = request.form["username"]
         session['password'] = request.form["password"]
         session['target_username'] = request.form["target_username"]
@@ -35,50 +30,22 @@ def index():
             login_in_progress = True
             client.login(session['username'], session['password'])
             login_in_progress = False
+            return redirect("/start")
+
         except ChallengeRequired as e:
             session['challenge_url'] = e.challenge_url
             return render_template("verify.html", error=None)
+
         except TwoFactorRequired:
-            return render_template("error.html", error="2FA code required but not provided.")
+            session['2fa_pending'] = True
+            return render_template("waiting_for_approval.html")
+
         except Exception as e:
             login_in_progress = False
             return render_template("error.html", error=f"Login failed: {str(e)}")
 
-        return redirect("/start")
-
     return render_template("index.html")
 
-@app.route("/start")
-def start():
-    target_username = session.get("target_username")
-    amount = session.get("amount")
-    relationship = session.get("relationship")
-
-    try:
-        user_id = client.user_id_from_username(target_username)
-        if relationship == "followers":
-            users = client.user_followers(user_id, amount=amount)
-        else:
-            users = client.user_following(user_id, amount=amount)
-
-        users = list(users.values())
-        message = session.get("message")
-        delay = session.get("delay")
-
-        threading.Thread(target=send_dms, args=(client, users, message, delay)).start()
-        return "DMs are being sent in the background."
-
-    except Exception as e:
-        return render_template("error.html", error=f"Failed to fetch users or send DMs: {e}")
-
-@app.route("/verify", methods=["POST"])
-def verify():
-    try:
-        client.challenge_resolve()
-        print("Account unlocked")
-        return redirect("/auto_retry_login")
-    except Exception as e:
-        return render_template("error.html", error=f"Challenge resolution failed: {str(e)}")
 
 @app.route("/auto_retry_login")
 def auto_retry_login():
@@ -91,9 +58,54 @@ def auto_retry_login():
         client.login(session['username'], session['password'])
         login_in_progress = False
         return redirect("/start")
+    except TwoFactorRequired:
+        login_in_progress = False
+        return render_template("waiting_for_approval.html")
     except Exception as e:
         login_in_progress = False
-        return render_template("error.html", error=f"Auto-login retry failed: {str(e)}")
+        return render_template("error.html", error=f"Retry failed: {str(e)}")
 
-if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8080)
+
+@app.route("/start")
+def start():
+    target_username = session["target_username"]
+    message = session["message"]
+    amount = session["amount"]
+    delay = session["delay"]
+    relationship = session["relationship"]
+
+    try:
+        if relationship == "followers":
+            users = client.user_followers(client.user_id_from_username(target_username), amount)
+        else:
+            users = client.user_following(client.user_id_from_username(target_username), amount)
+
+        usernames = list(users.values())[:amount]
+
+        def send_messages():
+            for user in usernames:
+                try:
+                    client.direct_send(message, [user.pk])
+                    print(f"Sent to {user.username}")
+                    time.sleep(delay)
+                except Exception as e:
+                    print(f"Failed to send to {user.username}: {e}")
+
+        threading.Thread(target=send_messages).start()
+
+        return render_template("success.html", usernames=[u.username for u in usernames])
+
+    except Exception as e:
+        return render_template("error.html", error=f"Failed to fetch users or send messages: {str(e)}")
+
+
+@app.route("/verify", methods=["POST"])
+def verify():
+    code = request.form["code"]
+    try:
+        client.challenge_resolve(session['challenge_url'])
+        client.challenge_send_code(session['challenge_url'])
+        client.challenge_code_submit(session['challenge_url'], code)
+        return redirect("/start")
+    except Exception as e:
+        return render_template("verify.html", error=f"Challenge failed: {str(e)}")
