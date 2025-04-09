@@ -1,27 +1,29 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head><title>Instagram DM Bot</title></head>
+<head>
+    <title>Instagram DM Bot</title>
+</head>
 <body>
-  <h2>Login and DM Setup</h2>
-  <form method="post">
-    <label>Username:</label><br>
-    <input type="text" name="username" required><br><br>
-    <label>Password:</label><br>
-    <input type="password" name="password" required><br><br>
-    <label>Target Account:</label><br>
-    <input type="text" name="target" required><br><br>
-    <label>Message to Send:</label><br>
-    <textarea name="message" required></textarea><br><br>
-    <label>Choose:</label>
-    <select name="mode">
-      <option value="followers">Followers</option>
-      <option value="following">Following</option>
-    </select><br><br>
-    <label>How Many:</label><br>
-    <input type="number" name="limit" value="10"><br><br>
-    <label>Delay (seconds):</label><br>
-    <input type="number" name="delay" value="5"><br><br>
-    <input type="submit" value="Login & Start">
-  </form>
+    <h2>Instagram DM Sender</h2>
+    <form method="post">
+        <label>Username:</label><br>
+        <input type="text" name="username"><br><br>
+        <label>Password:</label><br>
+        <input type="password" name="password"><br><br>
+        <label>Target Account Username:</label><br>
+        <input type="text" name="target_user"><br><br>
+        <label>Target Type:</label><br>
+        <select name="target_type">
+            <option value="followers">Followers</option>
+            <option value="following">Following</option>
+        </select><br><br>
+        <label>Message:</label><br>
+        <textarea name="message"></textarea><br><br>
+        <label>Max Users:</label><br>
+        <input type="number" name="max_users" value="10"><br><br>
+        <label>Delay (seconds):</label><br>
+        <input type="number" name="delay" step="0.1" value="2"><br><br>
+        <button type="submit">Login & Send DMs</button>
+    </form>
 </body>
 </html>
