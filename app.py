@@ -1,102 +1,110 @@
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, render_template, request, redirect, session
 from instagrapi import Client
-from instagrapi.exceptions import LoginRequired, TwoFactorRequired, ChallengeRequired
-import threading
+from instagrapi.exceptions import ChallengeRequired, TwoFactorRequired
 import time
+import threading
 import os
 
 app = Flask(__name__)
-session = {
-    "client": None,
-    "username": "",
-    "password": "",
-    "target": "",
-    "message": "",
-    "mode": "followers",
-    "limit": 10,
-    "delay": 5,
-    "login_status": "",
-    "challenge_required": False,
-    "login_attempt_in_progress": False
-}
+app.secret_key = os.urandom(24)
 
 
 def try_login():
     session["client"] = Client()
     session["client"].delay_range = [1, 3]
+    session["login_attempt_in_progress"] = True
 
     try:
         session["client"].login(session["username"], session["password"])
-        session["login_status"] = "Logged in"
+        session["login_status"] = "✅ Logged in successfully."
         session["challenge_required"] = False
-        session["login_attempt_in_progress"] = False
     except ChallengeRequired:
-        session["login_status"] = "Login challenge required. Please approve the login in your Instagram app or browser."
+        session["login_status"] = (
+            "⚠️ Login challenge required. Please approve in your Instagram app or browser."
+        )
         session["challenge_required"] = True
-        session["login_attempt_in_progress"] = True
     except TwoFactorRequired:
-        session["login_status"] = "2FA code required but not provided."
+        session["login_status"] = (
+            "❌ 2FA code required but not supported in this flow."
+        )
         session["challenge_required"] = False
-        session["login_attempt_in_progress"] = False
     except Exception as e:
-        session["login_status"] = f"Login failed: {str(e)}"
+        if "429" in str(e):
+            session["login_status"] = "⏳ Too many requests. Waiting 10 seconds before retry..."
+            time.sleep(10)
+            try_login()
+        else:
+            session["login_status"] = f"❌ Login failed: {str(e)}"
+    finally:
         session["login_attempt_in_progress"] = False
 
 
 @app.route("/", methods=["GET", "POST"])
-def home():
+def index():
     if request.method == "POST":
         session["username"] = request.form["username"]
         session["password"] = request.form["password"]
-        session["target"] = request.form["target"]
+        session["target_user"] = request.form["target_user"]
+        session["target_type"] = request.form["target_type"]
         session["message"] = request.form["message"]
-        session["mode"] = request.form["mode"]
-        session["limit"] = int(request.form["limit"])
-        session["delay"] = int(request.form["delay"])
+        session["max_users"] = int(request.form["max_users"])
+        session["delay"] = float(request.form["delay"])
 
+        session["login_status"] = "🔄 Logging in..."
         threading.Thread(target=try_login).start()
-        return redirect(url_for("status"))
+
+        return redirect("/status")
 
     return render_template("index.html")
 
 
 @app.route("/status")
 def status():
-    return render_template("status.html", status=session["login_status"])
+    return render_template("status.html", status=session.get("login_status", "No login attempt yet."))
 
 
 @app.route("/check_secure_account")
 def check_secure_account():
-    if session["challenge_required"] and session["login_attempt_in_progress"]:
+    if session.get("challenge_required") and not session.get("login_attempt_in_progress"):
+        session["login_status"] = "🔄 Retrying login after browser approval..."
         threading.Thread(target=try_login).start()
-        return "Retrying login after approval..."
-    return "No pending login challenge."
+        return "Triggered retry..."
+    return "Waiting for challenge approval or login in progress."
 
 
 @app.route("/send_dms")
 def send_dms():
-    cl = session.get("client")
-    if not cl or not cl.user_id:
-        return "Error: Not logged in."
+    if "client" not in session:
+        return "❌ Not logged in."
+
+    cl: Client = session["client"]
+    target_user = session["target_user"]
+    message = session["message"]
+    max_users = session["max_users"]
+    delay = session["delay"]
 
     try:
-        user_id = cl.user_id_from_username(session["target"])
-        if session["mode"] == "followers":
-            users = cl.user_followers(user_id, amount=session["limit"])
+        user_id = cl.user_id_from_username(target_user)
+
+        if session["target_type"] == "followers":
+            users = cl.user_followers(user_id)
         else:
-            users = cl.user_following(user_id, amount=session["limit"])
+            users = cl.user_following(user_id)
 
-        for i, user in enumerate(users.values()):
-            cl.direct_send(session["message"], [user.pk])
-            time.sleep(session["delay"])
-        return f"DMs sent to {len(users)} users."
+        count = 0
+        for uid, user in users.items():
+            if count >= max_users:
+                break
+            cl.direct_send(message, [uid])
+            count += 1
+            time.sleep(delay)
 
-    except LoginRequired:
-        return "Error: Instagram session expired. Please log in again."
+        return f"✅ Sent messages to {count} users."
+
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"❌ Failed to send messages: {str(e)}"
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
