@@ -2,33 +2,26 @@
 <html>
 <head><title>Instagram DM Bot</title></head>
 <body>
-  <h1>Instagram DM Bot</h1>
+  <h2>Login and DM Setup</h2>
   <form method="post">
-    <label>Instagram Username:</label><br>
-    <input name="username"><br><br>
-
-    <label>Instagram Password:</label><br>
-    <input name="password" type="password"><br><br>
-
-    <label>Target Username:</label><br>
-    <input name="target_username"><br><br>
-
+    <label>Username:</label><br>
+    <input type="text" name="username" required><br><br>
+    <label>Password:</label><br>
+    <input type="password" name="password" required><br><br>
+    <label>Target Account:</label><br>
+    <input type="text" name="target" required><br><br>
     <label>Message to Send:</label><br>
-    <textarea name="message"></textarea><br><br>
-
-    <label>Followers or Following:</label><br>
-    <select name="relationship">
+    <textarea name="message" required></textarea><br><br>
+    <label>Choose:</label>
+    <select name="mode">
       <option value="followers">Followers</option>
       <option value="following">Following</option>
     </select><br><br>
-
-    <label>How Many Accounts to Message:</label><br>
-    <input name="amount" type="number"><br><br>
-
-    <label>Delay Between Messages (seconds):</label><br>
-    <input name="delay" type="number" step="0.1"><br><br>
-
-    <button type="submit">Send DMs</button>
+    <label>How Many:</label><br>
+    <input type="number" name="limit" value="10"><br><br>
+    <label>Delay (seconds):</label><br>
+    <input type="number" name="delay" value="5"><br><br>
+    <input type="submit" value="Login & Start">
   </form>
 </body>
 </html>
