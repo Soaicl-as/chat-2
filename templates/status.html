@@ -1,11 +1,15 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Status</title>
-    <meta http-equiv="refresh" content="5">
 </head>
 <body>
-    <h3>Status: {{ status }}</h3>
-    <a href="/send_dms">Send DMs</a>
+    {% if logged_in %}
+        <h2>Logged in successfully!</h2>
+        <a href="{{ url_for('send_dms') }}">Send DMs</a>
+    {% else %}
+        <h2>Not logged in</h2>
+    {% endif %}
 </body>
 </html>
