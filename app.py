@@ -1,131 +1,99 @@
-from flask import Flask, render_template, request, redirect, session
-from instagrapi import Client
-from instagrapi.exceptions import ChallengeRequired, TwoFactorRequired
 import time
 import threading
 import os
-import uuid
+from flask import Flask, render_template, request, redirect, url_for, session
+from instagrapi import Client
+from instagrapi.exceptions import TwoFactorRequired
+from werkzeug.local import LocalProxy
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 
-# Global state dictionary to hold login sessions safely outside Flask's `session`
-login_state = {}
+# Session to store Instagram client
+client = LocalProxy(lambda: session.get('client'))
 
-def try_login(session_id):
-    cl = Client()
-    cl.delay_range = [1, 3]
-    login_state[session_id]["status"] = "🔄 Attempting login..."
+# Home route, displays login form
+@app.route('/')
+def home():
+    return render_template('index.html')
 
+# Handle login form submission
+@app.route('/', methods=["POST"])
+def login():
+    username = request.form.get('username')
+    password = request.form.get('password')
+
+    if not username or not password:
+        return "Please provide both username and password.", 400
+
+    # Initialize the client and attempt login
     try:
-        cl.login(
-            login_state[session_id]["username"],
-            login_state[session_id]["password"]
-        )
-        login_state[session_id]["status"] = "✅ Logged in successfully."
-        login_state[session_id]["client"] = cl
-        login_state[session_id]["challenge_required"] = False
-
-    except ChallengeRequired:
-        login_state[session_id]["status"] = (
-            "⚠️ Challenge required. Approve this login attempt in your Instagram app or browser."
-        )
-        login_state[session_id]["challenge_required"] = True
-
-    except TwoFactorRequired:
-        login_state[session_id]["status"] = (
-            "❌ 2FA not handled here. Try a different account."
-        )
-        login_state[session_id]["challenge_required"] = False
-
+        session["client"] = Client()
+        client.login(username, password)
+        return redirect(url_for('status'))
+    except TwoFactorRequired as e:
+        session['two_factor_identifier'] = e.two_factor_identifier
+        return redirect(url_for('verify'))
     except Exception as e:
-        if "429" in str(e):
-            login_state[session_id]["status"] = "⏳ 429 Too Many Requests. Retrying in 10s..."
-            time.sleep(10)
-            try_login(session_id)
-        else:
-            login_state[session_id]["status"] = f"❌ Login failed: {str(e)}"
+        return f"An error occurred: {e}", 500
 
-
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        session_id = str(uuid.uuid4())
-        session["session_id"] = session_id
-
-        login_state[session_id] = {
-            "username": request.form["username"],
-            "password": request.form["password"],
-            "target_user": request.form["target_user"],
-            "target_type": request.form["target_type"],
-            "message": request.form["message"],
-            "max_users": int(request.form["max_users"]),
-            "delay": float(request.form["delay"]),
-            "status": "🔄 Logging in...",
-            "client": None,
-            "challenge_required": False
-        }
-
-        threading.Thread(target=try_login, args=(session_id,)).start()
-        return redirect("/status")
-
-    return render_template("index.html")
-
-
-@app.route("/status")
+# Status route to show the current login status
+@app.route('/status')
 def status():
-    session_id = session.get("session_id")
-    if not session_id or session_id not in login_state:
-        return "No login in progress."
-    return render_template("status.html", status=login_state[session_id]["status"])
+    if client:
+        return render_template('status.html', logged_in=True)
+    return render_template('status.html', logged_in=False)
 
+# Handle 2FA verification page
+@app.route('/verify', methods=["POST", "GET"])
+def verify():
+    if request.method == 'POST':
+        code = request.form.get('code')
 
-@app.route("/check_secure_account")
-def check_secure_account():
-    session_id = session.get("session_id")
-    if not session_id or session_id not in login_state:
-        return "Invalid session."
+        if not code:
+            return "Please provide a 2FA code.", 400
 
-    if login_state[session_id]["challenge_required"]:
-        login_state[session_id]["status"] = "🔁 Retrying login after browser confirmation..."
-        threading.Thread(target=try_login, args=(session_id,)).start()
-        return "Retrying..."
+        try:
+            # Attempt to complete 2FA using the code
+            client.complete_two_factor_login(code, session['two_factor_identifier'])
+            return redirect(url_for('status'))
+        except Exception as e:
+            return f"Failed to verify 2FA: {e}", 500
 
-    return "No challenge or already in progress."
+    return render_template('verify.html')
 
-
-@app.route("/send_dms")
+# Send DMs route
+@app.route('/send_dms', methods=["GET"])
 def send_dms():
-    session_id = session.get("session_id")
-    if not session_id or session_id not in login_state:
-        return "Session not found."
+    if not client:
+        return redirect(url_for('home'))
 
-    data = login_state[session_id]
-    cl: Client = data.get("client")
-    if not cl:
-        return "❌ Not logged in yet."
+    # Send DMs logic
+    target_account = request.args.get('target_account')
+    if not target_account:
+        return "Please provide a target account.", 400
 
+    # Send DMs to followers or following
     try:
-        user_id = cl.user_id_from_username(data["target_user"])
-        if data["target_type"] == "followers":
-            users = cl.user_followers(user_id)
-        else:
-            users = cl.user_following(user_id)
-
-        count = 0
-        for uid, _ in users.items():
-            if count >= data["max_users"]:
-                break
-            cl.direct_send(data["message"], [uid])
-            count += 1
-            time.sleep(data["delay"])
-
-        return f"✅ DMs sent to {count} users."
-
+        users = client.user_following(target_account)
+        for user in users:
+            client.direct_send("Hello!", [user.pk])  # Example message
+        return "DMs sent successfully."
     except Exception as e:
-        return f"❌ Failed to send DMs: {str(e)}"
+        return f"An error occurred while sending DMs: {e}", 500
 
+# Threaded function to continuously check login and handle retries
+def try_login():
+    while True:
+        try:
+            if client and client.is_logged_in:
+                break  # Stop the loop if logged in
+            time.sleep(5)  # Retry after 5 seconds
+        except Exception as e:
+            print(f"Error in try_login: {e}")
+            time.sleep(5)
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+# Run the Flask app
+if __name__ == '__main__':
+    threading.Thread(target=try_login, daemon=True).start()
+    app.run(host="0.0.0.0", port=10000)
