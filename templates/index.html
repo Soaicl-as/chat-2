@@ -1,29 +1,19 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Instagram DM Bot</title>
 </head>
 <body>
-    <h2>Instagram DM Sender</h2>
-    <form method="post">
-        <label>Username:</label><br>
-        <input type="text" name="username"><br><br>
-        <label>Password:</label><br>
-        <input type="password" name="password"><br><br>
-        <label>Target Account Username:</label><br>
-        <input type="text" name="target_user"><br><br>
-        <label>Target Type:</label><br>
-        <select name="target_type">
-            <option value="followers">Followers</option>
-            <option value="following">Following</option>
-        </select><br><br>
-        <label>Message:</label><br>
-        <textarea name="message"></textarea><br><br>
-        <label>Max Users:</label><br>
-        <input type="number" name="max_users" value="10"><br><br>
-        <label>Delay (seconds):</label><br>
-        <input type="number" name="delay" step="0.1" value="2"><br><br>
-        <button type="submit">Login & Send DMs</button>
+    <h2>Login to Instagram</h2>
+    <form action="/" method="POST">
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username" required>
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <br><br>
+        <button type="submit">Login</button>
     </form>
 </body>
 </html>
